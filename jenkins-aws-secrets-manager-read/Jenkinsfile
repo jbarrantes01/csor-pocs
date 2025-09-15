@@ -1,0 +1,44 @@
+import groovy.json.JsonSlurper
+
+pipeline {
+    agent { label 'aws-ec2' }
+
+    environment {
+        AWS_REGION = 'us-east-1'
+    }
+
+    stages {
+        stage('Fetch Secrets') {
+            steps {
+                script {
+                    // Get the JSON secret from AWS Secrets Manager
+                    def secretJson = sh(
+                        script: "aws secretsmanager get-secret-value --secret-id mySecretName --region ${env.AWS_REGION} --query SecretString --output text",
+                        returnStdout: true
+                    ).trim()
+
+                    // Parse JSON string into a Groovy Map
+                    def json = new JsonSlurper().parseText(secretJson)
+
+                    // Iterate through keys and set env vars dynamically
+                    json.each { key, value ->
+                        echo "Setting env var for ${key}" // don’t log the value
+                        env."${key.toUpperCase()}" = value.toString()
+                    }
+                }
+            }
+        }
+
+        stage('Use Secrets') {
+            steps {
+                sh '''
+                    echo "Now you can access your secrets"
+                    # Example: if JSON had {"db_user":"admin","db_pass":"s3cr3t"}
+                    # Then you have $DB_USER and $DB_PASS available
+                    printenv
+                    echo "This is a PoC, printing secret values is not recomended
+                '''
+            }
+        }
+    }
+}
