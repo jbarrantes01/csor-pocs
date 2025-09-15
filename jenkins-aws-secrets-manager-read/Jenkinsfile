@@ -3,19 +3,17 @@ import groovy.json.JsonSlurper
 pipeline {
     agent { label 'aws-ec2' }
 
-    environment {
-        AWS_REGION = 'us-east-1'
-    }
-
     stages {
         stage('Fetch Secrets') {
             steps {
                 script {
                     // Get the JSON secret from AWS Secrets Manager
-                    def secretJson = sh(
-                        script: "aws secretsmanager get-secret-value --secret-id mySecretName --region ${env.AWS_REGION} --query SecretString --output text",
-                        returnStdout: true
-                    ).trim()
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: "${params.AWS_ACCOUNT}"]]) {
+                        def secretJson = sh(
+                            script: "aws secretsmanager get-secret-value --secret-id ${params.SECRET_NAME} --region ${params.AWS_REGION} --query SecretString --output text",
+                            returnStdout: true
+                        ).trim()   
+                    }
 
                     // Parse JSON string into a Groovy Map
                     def json = new JsonSlurper().parseText(secretJson)
